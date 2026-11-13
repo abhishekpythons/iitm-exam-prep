@@ -1,6 +1,7 @@
 (function () {
   const R = String.raw;
   window.SUBJECTS.push({
+    exam: 'quiz1',
     id: 'corporate-finance',
     name: 'Corporate Finance',
     short: 'Corp Finance',

@@ -1,4 +1,7 @@
-/* Quiz 1 Prep — Vue 3 single-page app (no build step, hash routing). */
+/* IITM Exam Prep — Vue 3 single-page app (no build step, hash routing).
+   Routes:  #/                         home (all exams)
+            #/<exam>                   one exam's subjects
+            #/<exam>/<subject>/<tab>   a subject page                       */
 (function () {
   const { createApp, ref, reactive, computed, watch, onMounted, onBeforeUnmount } = Vue;
 
@@ -24,6 +27,12 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode */ } }
   };
   const plain = s => s.replace(/<[^>]+>/g, ' ').replace(/\$/g, ' ').toLowerCase();
+  const revKey = s => 'rev:' + s.exam + ':' + s.id;
+  const subjectBase = s => '#/' + s.exam + '/' + s.id;
+  const revisedCount = s => {
+    const d = store.get(revKey(s), {});
+    return s.topics.filter(t => d[t.title]).length;
+  };
 
   const TABS = [
     { id: 'overview', label: 'Exam pattern' },
@@ -35,7 +44,7 @@
 
   /* ---------- components ---------- */
   const QuizCard = {
-    props: ['item', 'index', 'sid'],
+    props: ['item', 'index'],
     emits: ['answered'],
     setup(props, { emit }) {
       const picked = ref(null);
@@ -44,8 +53,7 @@
         picked.value = i;
         emit('answered', i === props.item.answer);
       };
-      const reset = () => { picked.value = null; };
-      return { picked, pick, reset, rich };
+      return { picked, pick, rich };
     },
     template: `
       <article class="card quiz">
@@ -66,9 +74,25 @@
       </article>`
   };
 
+  const SubjectCard = {
+    props: ['s'],
+    setup() { return { subjectBase, revisedCount }; },
+    template: `
+      <a class="card subject-card" :href="subjectBase(s) + '/overview'" :style="{ '--accent': s.color }">
+        <p class="eyebrow">{{ s.level }}</p>
+        <h2>{{ s.name }}</h2>
+        <p>{{ s.blurb }}</p>
+        <ul class="chips"><li v-for="c in s.chips" :key="c">{{ c }}</li></ul>
+        <div class="meter" :aria-label="revisedCount(s) + ' of ' + s.topics.length + ' topics revised'">
+          <span :style="{ width: (100 * revisedCount(s) / s.topics.length) + '%' }"></span>
+        </div>
+        <p class="meta">{{ revisedCount(s) }} / {{ s.topics.length }} topics revised · {{ s.quiz.length }} practice questions</p>
+      </a>`
+  };
+
   const SubjectPage = {
     components: { QuizCard },
-    props: ['subject', 'tab'],
+    props: ['subject', 'exam', 'tab'],
     setup(props) {
       const filter = ref('');
       const done = reactive({});
@@ -78,17 +102,17 @@
 
       const load = () => {
         Object.keys(done).forEach(k => delete done[k]);
-        Object.assign(done, store.get('rev:' + props.subject.id, {}));
+        Object.assign(done, store.get(revKey(props.subject), {}));
         Object.keys(open).forEach(k => delete open[k]);
         filter.value = '';
         score.right = 0; score.total = 0; quizKey.value++;
       };
       load();
-      watch(() => props.subject.id, load);
+      watch(() => revKey(props.subject), load);
 
       const toggleDone = t => {
         done[t.title] = !done[t.title];
-        store.set('rev:' + props.subject.id, { ...done });
+        store.set(revKey(props.subject), { ...done });
       };
       const f = computed(() => filter.value.trim().toLowerCase());
       const topics = computed(() => props.subject.topics.filter(t => !f.value || plain(t.title + ' ' + t.html).includes(f.value)));
@@ -98,20 +122,21 @@
       const doneCount = computed(() => props.subject.topics.filter(t => done[t.title]).length);
       const answered = ok => { score.total++; if (ok) score.right++; };
       const restart = () => { score.right = 0; score.total = 0; quizKey.value++; };
+      const base = computed(() => subjectBase(props.subject));
 
-      return { TABS, filter, done, open, toggleDone, topics, formulas, doneCount, score, answered, restart, quizKey, rich };
+      return { TABS, filter, done, open, toggleDone, topics, formulas, doneCount, score, answered, restart, quizKey, rich, base };
     },
     template: `
       <section class="subject" :style="{ '--accent': subject.color }">
         <header class="hero">
-          <a class="back" href="#/">← All subjects</a>
-          <p class="eyebrow">{{ subject.level }}</p>
+          <a class="back" :href="'#/' + exam.id">← {{ exam.name }} subjects</a>
+          <p class="eyebrow">{{ exam.name }} · {{ subject.level }}</p>
           <h1>{{ subject.name }}</h1>
           <p class="lede">{{ subject.blurb }}</p>
         </header>
 
         <nav class="tabs" aria-label="Sections">
-          <a v-for="t in TABS" :key="t.id" :href="'#/' + subject.id + '/' + t.id" :class="{ active: tab === t.id }">{{ t.label }}</a>
+          <a v-for="t in TABS" :key="t.id" :href="base + '/' + t.id" :class="{ active: tab === t.id }">{{ t.label }}</a>
         </nav>
 
         <!-- Exam pattern -->
@@ -194,39 +219,43 @@
             <span class="progress">Score: {{ score.right }} / {{ score.total }} answered ({{ subject.quiz.length }} questions)</span>
             <button type="button" class="ghost" @click="restart">Restart</button>
           </div>
-          <quiz-card v-for="(q, i) in subject.quiz" :key="quizKey + '-' + i" :item="q" :index="i" :sid="subject.id" @answered="answered"></quiz-card>
+          <quiz-card v-for="(q, i) in subject.quiz" :key="quizKey + '-' + i" :item="q" :index="i" @answered="answered"></quiz-card>
         </div>
       </section>`
   };
 
-  const HomePage = {
-    props: ['subjects'],
-    setup(props) {
-      const revised = s => {
-        const d = store.get('rev:' + s.id, {});
-        return s.topics.filter(t => d[t.title]).length;
-      };
-      return { revised };
-    },
+  const ExamPage = {
+    components: { SubjectCard },
+    props: ['exam', 'subjects'],
     template: `
       <section class="home">
         <header class="hero">
-          <p class="eyebrow">IIT Madras BS · Quiz 1</p>
-          <h1>Revise what the papers actually ask.</h1>
-          <p class="lede">Four subjects. For each one: the recurring question types from past Quiz 1 papers, the concepts behind them, a formula sheet, worked solutions, and practice questions with explanations.</p>
+          <a class="back" href="#/">← All exams</a>
+          <p class="eyebrow">IIT Madras BS</p>
+          <h1>{{ exam.name }}</h1>
+          <p class="lede">{{ exam.blurb }} {{ subjects.length }} subject{{ subjects.length === 1 ? '' : 's' }} so far.</p>
         </header>
-        <div class="grid">
-          <a v-for="s in subjects" :key="s.id" class="card subject-card" :href="'#/' + s.id + '/overview'" :style="{ '--accent': s.color }">
-            <p class="eyebrow">{{ s.level }}</p>
-            <h2>{{ s.name }}</h2>
-            <p>{{ s.blurb }}</p>
-            <ul class="chips"><li v-for="c in s.chips" :key="c">{{ c }}</li></ul>
-            <div class="meter" :aria-label="revised(s) + ' of ' + s.topics.length + ' topics revised'">
-              <span :style="{ width: (100 * revised(s) / s.topics.length) + '%' }"></span>
-            </div>
-            <p class="meta">{{ revised(s) }} / {{ s.topics.length }} topics revised · {{ s.quiz.length }} practice questions</p>
-          </a>
-        </div>
+        <div class="grid"><subject-card v-for="s in subjects" :key="s.id" :s="s"></subject-card></div>
+      </section>`
+  };
+
+  const HomePage = {
+    components: { SubjectCard },
+    props: ['groups'],
+    template: `
+      <section class="home">
+        <header class="hero">
+          <p class="eyebrow">IIT Madras BS</p>
+          <h1>Revise what the papers actually ask.</h1>
+          <p class="lede">For each subject: the recurring question types from past papers, the concepts behind them, a formula sheet, worked solutions, and practice questions with explanations.</p>
+        </header>
+        <section v-for="g in groups" :key="g.exam.id" class="exam-group">
+          <div class="exam-head">
+            <h2><a :href="'#/' + g.exam.id">{{ g.exam.name }}</a></h2>
+            <span class="meta">{{ g.subjects.length }} subject{{ g.subjects.length === 1 ? '' : 's' }}</span>
+          </div>
+          <div class="grid"><subject-card v-for="s in g.subjects" :key="s.id" :s="s"></subject-card></div>
+        </section>
         <div class="card how">
           <h2>How to use this</h2>
           <ol>
@@ -242,17 +271,24 @@
 
   /* ---------- root ---------- */
   createApp({
-    components: { HomePage, SubjectPage },
+    components: { HomePage, ExamPage, SubjectPage },
     setup() {
       const subjects = window.SUBJECTS;
+      const groups = window.EXAMS
+        .map(exam => ({ exam, subjects: subjects.filter(s => s.exam === exam.id) }))
+        .filter(g => g.subjects.length);
+
       const route = ref(location.hash || '#/');
       const onHash = () => { route.value = location.hash || '#/'; window.scrollTo(0, 0); };
       onMounted(() => window.addEventListener('hashchange', onHash));
       onBeforeUnmount(() => window.removeEventListener('hashchange', onHash));
 
       const parts = computed(() => route.value.replace(/^#\/?/, '').split('/').filter(Boolean));
-      const subject = computed(() => subjects.find(s => s.id === parts.value[0]) || null);
-      const tab = computed(() => TABS.some(t => t.id === parts.value[1]) ? parts.value[1] : 'overview');
+      const group = computed(() => groups.find(g => g.exam.id === parts.value[0]) || null);
+      const exam = computed(() => group.value && group.value.exam);
+      const subject = computed(() => group.value && group.value.subjects.find(s => s.id === parts.value[1]) || null);
+      const tab = computed(() => TABS.some(t => t.id === parts.value[2]) ? parts.value[2] : 'overview');
+      const navSubjects = computed(() => group.value ? group.value.subjects : []);
 
       const theme = ref(store.get('theme', null));
       const applyTheme = () => {
@@ -266,24 +302,33 @@
         store.set('theme', theme.value);
         applyTheme();
       };
-      watch(subject, s => { document.title = (s ? s.name + ' — ' : '') + 'Quiz 1 Prep'; }, { immediate: true });
+      watch([subject, exam], ([s, e]) => {
+        document.title = (s ? s.name + ' · ' : '') + (e ? e.name + ' — ' : '') + 'IITM Exam Prep';
+      }, { immediate: true });
 
-      return { subjects, subject, tab, toggleTheme };
+      return { groups, group, exam, subject, tab, navSubjects, toggleTheme, subjectBase };
     },
     template: `
       <div class="shell">
         <header class="topbar">
-          <a class="brand" href="#/">Quiz 1 Prep</a>
-          <nav class="subnav" aria-label="Subjects">
-            <a v-for="s in subjects" :key="s.id" :href="'#/' + s.id + '/overview'" :class="{ active: subject && subject.id === s.id }">{{ s.short }}</a>
+          <a class="brand" href="#/">IITM Exam Prep</a>
+          <nav class="subnav" aria-label="Exams and subjects">
+            <template v-if="!group">
+              <a v-for="g in groups" :key="g.exam.id" :href="'#/' + g.exam.id">{{ g.exam.name }}</a>
+            </template>
+            <template v-else>
+              <a :href="'#/' + exam.id" :class="{ active: !subject }">{{ exam.name }}</a>
+              <a v-for="s in navSubjects" :key="s.id" :href="subjectBase(s) + '/overview'" :class="{ active: subject && subject.id === s.id }">{{ s.short }}</a>
+            </template>
           </nav>
           <button type="button" class="ghost theme" @click="toggleTheme" aria-label="Switch between light and dark theme">Theme</button>
         </header>
         <main>
-          <subject-page v-if="subject" :subject="subject" :tab="tab"></subject-page>
-          <home-page v-else :subjects="subjects"></home-page>
+          <subject-page v-if="subject" :subject="subject" :exam="exam" :tab="tab"></subject-page>
+          <exam-page v-else-if="group" :exam="exam" :subjects="group.subjects"></exam-page>
+          <home-page v-else :groups="groups"></home-page>
         </main>
-        <footer class="foot">Study notes written from the recurring question types in past Quiz 1 papers. Always cross-check with your course material.</footer>
+        <footer class="foot">Study notes written from the recurring question types in past exam papers. Always cross-check with your course material.</footer>
       </div>`
   }).mount('#app');
 })();

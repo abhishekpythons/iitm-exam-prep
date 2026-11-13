@@ -1,6 +1,6 @@
-# Quiz 1 Prep
+# IITM Exam Prep
 
-Study site for IIT Madras BS Quiz 1 covering four subjects:
+Study site for IIT Madras BS exams (Quiz 1, Quiz 2, End Term). Current subjects (Quiz 1):
 
 - Game Theory and Strategy
 - Corporate Finance
@@ -17,7 +17,8 @@ Vue 3, loaded from a CDN. There is no build step: the repository root is the sit
 index.html
 css/style.css
 js/app.js                 Vue app: router, pages, components
-js/data/*.js              One content file per subject
+js/exams.js               Exam registry (quiz1, quiz2, endterm)
+js/data/<exam>/*.js       One content file per subject
 ```
 
 ## Run locally
@@ -39,4 +40,6 @@ Then open http://localhost:8000.
 
 ## Editing content
 
-Each file in `js/data/` pushes one subject object onto `window.SUBJECTS`. Text fields accept HTML, with `$...$` for inline maths and `$$...$$` for display maths (LaTeX). Add a topic, formula, example or question by appending to the matching array.
+Each file in `js/data/<exam>/` pushes one subject object onto `window.SUBJECTS`. Text fields accept HTML, with `$...$` for inline maths and `$$...$$` for display maths (LaTeX). Add a topic, formula, example or question by appending to the matching array.
+
+To add a subject with Claude Code, open this folder and run `/add-subject quiz2 <quizpractice URL>` (see `.claude/skills/add-subject/SKILL.md`).

@@ -1,6 +1,7 @@
 (function () {
   const R = String.raw;
   window.SUBJECTS.push({
+    exam: 'quiz1',
     id: 'deep-learning',
     name: 'Deep Learning',
     short: 'Deep Learning',

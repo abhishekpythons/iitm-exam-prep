@@ -1,6 +1,7 @@
 (function () {
   const R = String.raw;
   window.SUBJECTS.push({
+    exam: 'quiz1',
     id: 'embedded-c',
     name: 'Embedded C Programming',
     short: 'Embedded C',

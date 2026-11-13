@@ -1,6 +1,7 @@
 (function () {
   const R = String.raw;
   window.SUBJECTS.push({
+    exam: 'quiz1',
     id: 'game-theory',
     name: 'Game Theory and Strategy',
     short: 'Game Theory',

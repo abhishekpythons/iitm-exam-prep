@@ -70,7 +70,13 @@ button, input { font: inherit; color: inherit; }
 .meter { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; }
 .meter span { display: block; height: 100%; background: var(--accent); }
 .meta { font-size: 13px !important; }
-.how { margin-top: 16px; }
+.how { margin-top: 32px; }
+.exam-group + .exam-group { margin-top: 32px; }
+.exam-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.exam-head h2 { font-size: 22px; letter-spacing: -0.01em; }
+.exam-head a { text-decoration: none; }
+.exam-head a:hover { text-decoration: underline; }
+.exam-head .meta { color: var(--muted); }
 .how ol { margin: 0; padding-left: 20px; color: var(--muted); }
 .how strong { color: var(--ink); }
 
